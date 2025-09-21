@@ -13,15 +13,19 @@ if st.button("Analyze"):
     if input_text.strip() == "":
         st.warning("Please enter some input first!")
     else:
-        with st.spinner("Analyzing requirements..."):
-            response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are an AI assistant that extracts, clarifies, and validates software requirements."},
-                    {"role": "user", "content": f"Extract requirements, detect ambiguities, and suggest clarifications from: {input_text}"}
-                ]
-            )
-            result = response["choices"][0]["message"]["content"]
+        if not openai.api_key:  # no key set
+            st.info("✅ Demo mode: OpenAI key not set. Showing sample output.")
+            st.write(f"Requirements extracted from your notes:\n- {input_text}\n- (…example…)")            
+        else:
+            with st.spinner("Analyzing requirements..."):
+                response = openai.ChatCompletion.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are an AI assistant that extracts, clarifies, and validates software requirements."},
+                        {"role": "user", "content": f"Extract requirements, detect ambiguities, and suggest clarifications from: {input_text}"}
+                    ]
+                )
+                result = response["choices"][0]["message"]["content"]
+                st.subheader("📋 Analysis Result")
+                st.write(result)
 
-        st.subheader("📋 Analysis Result")
-        st.write(result)
