@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Stakeholder Requirement Validator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 :root{--bg:#0f1724;--card:#0b1220;--accent:#4f46e5;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
 *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
@@ -22,6 +23,7 @@ textarea{min-height:80px}
 .align{font-size:12px;color:#94a3b8;margin-left:14px}
 .noalign{font-size:12px;color:#ef4444;margin-left:14px}
 pre{background:rgba(255,255,255,0.05);padding:10px;border-radius:8px;max-height:300px;overflow:auto;font-size:13px}
+canvas{background:rgba(255,255,255,0.02);padding:6px;border-radius:10px;margin-top:10px}
 </style>
 </head>
 <body>
@@ -52,6 +54,8 @@ pre{background:rgba(255,255,255,0.05);padding:10px;border-radius:8px;max-height:
       <pre id="reqOut"></pre>
       <label class="small">Contradictions</label>
       <pre id="conOut"></pre>
+      <canvas id="barChart"></canvas>
+      <canvas id="pieChart"></canvas>
     </aside>
   </div>
 </div>
@@ -77,7 +81,6 @@ const DATASET = [
 function conciseValue(point, clarAns){
   const textAll = Object.values(clarAns).join(" ").toLowerCase();
   if(!textAll) return "⚠ Missing";
-
   if(point.includes("Fast delivery")){
     if(textAll.includes("30")) return "Under 30 minutes";
     if(textAll.includes("fast")) return "Fast";
@@ -88,7 +91,6 @@ function conciseValue(point, clarAns){
   if(point.includes("languages")) return textAll.match(/english|hindi|tamil/) ? "English, Regional" : "⚠ Missing";
   if(point.includes("security")) return textAll.includes("2fa") || textAll.includes("secure") ? "2FA, Secure Login" : "⚠ Missing";
   if(point.includes("login")) return textAll.includes("frictionless") ? "Frictionless" : "⚠ Missing";
-
   return "⚠ Missing";
 }
 
@@ -101,6 +103,8 @@ function downloadFile(data, filename){
 }
 
 // ===== UI logic =====
+let barChart, pieChart;
+
 document.getElementById('generate').addEventListener('click', ()=>{
   const questions = [
     "Do you need fast delivery (under 30 minutes)?",
@@ -148,25 +152,24 @@ document.getElementById('process').addEventListener('click', ()=>{
     alignment[req]=match||null;
   });
 
-  // Show results
+  // Show textual results
   const reqOut=document.getElementById('reqOut'); reqOut.innerHTML='';
+  let validCount=0, missingCount=0;
   Object.entries(requirements).forEach(([req,val])=>{
     const line=document.createElement('div');
-    line.className=val.includes("⚠")?"missing":"valid";
+    if(val.includes("⚠")){line.className="missing"; missingCount++;}
+    else{line.className="valid"; validCount++;}
     line.textContent=`• ${req}: ${val}`;
     reqOut.appendChild(line);
-
+    const info=document.createElement('div');
     if(alignment[req]){
-      const info=document.createElement('div');
       info.className="align";
       info.textContent=`→ Aligns with goal: ${alignment[req].goal}`;
-      reqOut.appendChild(info);
     } else {
-      const info=document.createElement('div');
       info.className="noalign";
       info.textContent="→ ❌ No matching dataset goal";
-      reqOut.appendChild(info);
     }
+    reqOut.appendChild(info);
   });
 
   const conOut=document.getElementById('conOut'); conOut.innerHTML='';
@@ -180,6 +183,36 @@ document.getElementById('process').addEventListener('click', ()=>{
   } else {
     conOut.innerHTML='<div class="valid">✅ No contradictions found</div>';
   }
+
+  // --- Charts ---
+  const barCtx=document.getElementById('barChart').getContext('2d');
+  if(barChart) barChart.destroy();
+  barChart=new Chart(barCtx,{
+    type:'bar',
+    data:{
+      labels:['Valid','Missing'],
+      datasets:[{
+        label:'Requirements status',
+        data:[validCount, missingCount],
+        backgroundColor:['#22c55e','#eab308']
+      }]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+  });
+
+  const pieCtx=document.getElementById('pieChart').getContext('2d');
+  if(pieChart) pieChart.destroy();
+  pieChart=new Chart(pieCtx,{
+    type:'pie',
+    data:{
+      labels:['No Conflicts','Conflicts'],
+      datasets:[{
+        data:[contradictions.length?0:1, contradictions.length],
+        backgroundColor:['#22c55e','#ef4444']
+      }]
+    },
+    options:{plugins:{legend:{position:'bottom'}}}
+  });
 
   // Auto-download results
   downloadFile({requirements,contradictions,alignment},"results.json");
